@@ -8,18 +8,75 @@ output:
 
 ## Loading and preprocessing the data
 
+```{r echo=TRUE, message=FALSE}
+library(dplyr)
+library(lattice)
+baseDir <- "/home/mdonovan/Classes/ReproducibleResearch/Project1/"
+setwd(baseDir)
 
+dataZipFile <- "repdata_data_activity.zip"
+dataFile <- "activity.csv"
+zipURL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+
+################ set up dataframe
+if(! file.exists(dataZipFile)){
+  download.file(zipURL, dataZipFile ) 
+  unzip( dataZipFile)
+}
+if(! exists("activityData") ){
+  activityData <- data.frame()
+}
+if(nrow(activityData) == 0){
+  activityData <- read.csv(dataFile)
+  activityData$date.asDate <- as.Date(as.character(activityData$date), format =  "%Y-%m-%d")
+}
+```
 
 ## What is mean total number of steps taken per day?
 
-
+```{r echo=TRUE, message=FALSE}
+stepsPerDay <- aggregate(steps ~ date, activityData, sum, na.rm=TRUE)
+hist(stepsPerDay$steps, xlab = "Steps", main = "Steps per Day")
+```
 
 ## What is the average daily activity pattern?
 
+```{r echo=TRUE, message=FALSE}
+intervalAvgs <-activityData %>% 
+  group_by(interval) %>% 
+  summarise(meanSteps = mean(steps, na.rm = TRUE) )
 
+intervalAvgs<-aggregate(steps~interval, data=activityData, mean, na.rm=TRUE)
+plot(steps ~ interval, data = intervalAvgs,  type = "l")
+```
 
 ## Imputing missing values
 
+```{r echo=TRUE, message=FALSE}
+impute <-function(interval){
+  return(df[df$interval == interval, 2])
+}
 
+df <- as.data.frame(intervalAvgs)
+activityData <- mutate( activityData, imputedSteps = NA)
+for(i in 1:nrow(activityData)){
+  if(is.na(activityData[i,1])){
+     activityData[i,5] = impute(activityData[i, 3])
+  } else {
+    activityData[i,5] = activityData[i,1]
+  }
+}
+imputedStepsPerDay <- aggregate(imputedSteps ~ date, activityData, sum, na.rm=TRUE)
+hist(imputedStepsPerDay$imputedSteps, xlab = "Steps", main = "Steps per Day (Imputed Values)")
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r echo=TRUE, message=FALSE}
+activityData <- activityData %>% 
+  mutate(dayType = ifelse(grepl("Saturday|Sunday", weekdays(date.asDate)), "weekday", "weekend" ))
+avgByWeekday <- aggregate(x = activityData$imputedSteps, by = list(activityData$dayType, activityData$interval), FUN = mean)
+names(avgByWeekday) <- c("dayType", "interval", "avgSteps")
+plot4 <-xyplot(avgSteps ~ interval | dayType, data = avgByWeekday, type = "l", layout = c(1, 2), xlab = "Interval", ylab = "Number of Steps", main = "Weekday vs. Weekend")
+print(plot4)
+```
